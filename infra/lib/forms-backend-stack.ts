@@ -20,10 +20,16 @@ export class FormsBackendStack extends cdk.Stack {
       description: "Secret key de Google reCAPTCHA v3 (sitekey 6Le240AtAAAAANz_-yCkJ5fyJqeB0ppxA6617-B1).",
     });
 
-    const makeWebhookUrl = new cdk.CfnParameter(this, "MakeWebhookUrl", {
+    const contactWebhookUrl = new cdk.CfnParameter(this, "ContactWebhookUrl", {
       type: "String",
       noEcho: true,
-      description: "URL del webhook de Make.com que envía el email desde facturacio@nimbustelecom.cat.",
+      description: "URL del webhook de Make.com para el formulario de contacto (608).",
+    });
+
+    const callMeWebhookUrl = new cdk.CfnParameter(this, "CallMeWebhookUrl", {
+      type: "String",
+      noEcho: true,
+      description: "URL del webhook de Make.com para el formulario de llamada (644).",
     });
 
     const submitFormFn = new NodejsFunction(this, "SubmitFormFunction", {
@@ -37,7 +43,8 @@ export class FormsBackendStack extends cdk.Stack {
       },
       environment: {
         RECAPTCHA_SECRET: recaptchaSecret.valueAsString,
-        MAKE_WEBHOOK_URL: makeWebhookUrl.valueAsString,
+        CONTACT_WEBHOOK_URL: contactWebhookUrl.valueAsString,
+        CALLME_WEBHOOK_URL: callMeWebhookUrl.valueAsString,
       },
     });
 

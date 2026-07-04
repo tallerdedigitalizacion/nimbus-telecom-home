@@ -21,6 +21,11 @@
   };
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  // Solo dígitos: si alguien necesita marcar internacional, usa "00" en vez de "+".
+  const PHONE_REGEX = /^\d{7,15}$/;
+  // Letras (incluye acentos/ñ), espacios, guiones y apóstrofes; nada de dígitos ni símbolos.
+  const NAME_REGEX = /^[\p{L}\s'-]+$/u;
+  const MIN_MESSAGE_LENGTH = 3;
 
   // GTranslate ("on the fly", sin subcarpetas /en//ca/) guarda el idioma activo en esta cookie.
   const getLanguage = () => {
@@ -47,6 +52,13 @@
     if (!rules) return false;
     if (rules.required.some((name) => !fields[name])) return false;
     if (fields.email && !isValidEmail(fields.email)) return false;
+    // telefono, nombre y mensaje son opcionales, pero si vienen rellenos deben ser válidos.
+    const telefono = (fields.telefono || "").trim();
+    if (telefono && !PHONE_REGEX.test(telefono)) return false;
+    const nombre = (fields.nombre || "").trim();
+    if (nombre && !NAME_REGEX.test(nombre)) return false;
+    const mensaje = (fields.mensaje || "").trim();
+    if (mensaje && mensaje.length < MIN_MESSAGE_LENGTH) return false;
     return true;
   };
 
