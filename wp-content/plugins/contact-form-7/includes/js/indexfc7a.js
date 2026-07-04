@@ -15,7 +15,6 @@
 
   const MESSAGES = {
     invalid: "Por favor, revisa los campos obligatorios.",
-    sending: "Enviando...",
     success: "Gracias, hemos recibido tu mensaje. Te contactaremos lo antes posible.",
     error: "No se ha podido enviar el formulario. Inténtalo de nuevo más tarde.",
   };
@@ -62,20 +61,38 @@
     return true;
   };
 
-  const showMessage = (form, text, isError) => {
+  // El CSS de Contact Form 7 (includes/css/styles.css) oculta .wpcf7-response-output
+  // mientras el <form> tenga la clase "init"/"resetting"/"submitting", y colorea el
+  // borde según "sent"/"invalid"/"failed". Sin gestionar esta clase el mensaje queda
+  // siempre oculto (el form nace con "init" y nadie se la quita).
+  const STATUS_CLASSES = ["init", "resetting", "submitting", "invalid", "unaccepted", "spam", "aborted", "sent", "failed", "payment-required"];
+
+  const setStatus = (form, status) => {
+    STATUS_CLASSES.forEach((cls) => form.classList.remove(cls));
+    form.classList.add(status);
+    form.setAttribute("data-status", status);
+  };
+
+  const showMessage = (form, text) => {
     const output = form.querySelector(".wpcf7-response-output");
     if (!output) return;
     output.textContent = text;
     output.setAttribute("aria-hidden", "false");
-    output.classList.toggle("wpcf7-mail-sent-ok", !isError);
-    output.classList.toggle("wpcf7-validation-errors", isError);
   };
 
-  const setSubmitting = (form, isSubmitting) => {
+  const setSubmitButtonsDisabled = (form, disabled) => {
     form.querySelectorAll('input[type="submit"]').forEach((btn) => {
-      btn.disabled = isSubmitting;
+      btn.disabled = disabled;
     });
-    form.classList.toggle("submitting", isSubmitting);
+  };
+
+  // El botón de envío ya trae la clase "has-spinner"; CF7 le inserta este span al lado
+  // para mostrar/ocultar el spinner vía CSS (form.submitting .wpcf7-spinner).
+  const ensureSpinner = (form) => {
+    form.querySelectorAll(".has-spinner").forEach((el) => {
+      if (el.nextElementSibling && el.nextElementSibling.classList.contains("wpcf7-spinner")) return;
+      el.insertAdjacentHTML("afterend", '<span class="wpcf7-spinner"></span>');
+    });
   };
 
   // El módulo de reCAPTCHA de CF7 (modules/recaptcha) ya ejecuta grecaptcha con este mismo
@@ -104,12 +121,13 @@
     const fields = collectFields(form);
 
     if (!validate(formId, fields)) {
-      showMessage(form, MESSAGES.invalid, true);
+      setStatus(form, "invalid");
+      showMessage(form, MESSAGES.invalid);
       return;
     }
 
-    setSubmitting(form, true);
-    showMessage(form, MESSAGES.sending, false);
+    setStatus(form, "submitting");
+    setSubmitButtonsDisabled(form, true);
 
     getRecaptchaToken()
       .then((recaptchaToken) =>
@@ -131,16 +149,19 @@
       })
       .then((data) => {
         if (!data || !data.ok) throw new Error("backend error");
-        showMessage(form, MESSAGES.success, false);
+        setStatus(form, "sent");
+        showMessage(form, MESSAGES.success);
         form.reset();
       })
       .catch(() => {
-        showMessage(form, MESSAGES.error, true);
+        setStatus(form, "failed");
+        showMessage(form, MESSAGES.error);
       })
       .then(() => {
-        setSubmitting(form, false);
+        setSubmitButtonsDisabled(form, false);
       });
   };
 
+  document.querySelectorAll(".wpcf7-form").forEach(ensureSpinner);
   document.addEventListener("submit", onSubmit, true);
 })();
