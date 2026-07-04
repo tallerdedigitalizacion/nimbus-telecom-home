@@ -1,10 +1,20 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 
 const RECAPTCHA_SECRET = process.env.RECAPTCHA_SECRET ?? "";
-const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL ?? "";
 const RECAPTCHA_MIN_SCORE = 0.5;
 
 type FormId = "608" | "644";
+
+const WEBHOOK_URLS: Record<FormId, string> = {
+  "608": process.env.CONTACT_WEBHOOK_URL ?? "",
+  "644": process.env.CALLME_WEBHOOK_URL ?? "",
+};
+
+// Solo dígitos: si alguien necesita marcar internacional, usa "00" en vez de "+".
+const PHONE_REGEX = /^\d{7,15}$/;
+// Letras (incluye acentos/ñ), espacios, guiones y apóstrofes; nada de dígitos ni símbolos.
+const NAME_REGEX = /^[\p{L}\s'-]+$/u;
+const MIN_MESSAGE_LENGTH = 3;
 
 const FIELD_LABELS: Record<string, string> = {
   nombre: "Nombre",
@@ -91,14 +101,28 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
       return jsonResponse(400, { ok: false, error: `Falta el campo obligatorio: ${requiredField}.` });
     }
   }
+
+  // nombre, teléfono y mensaje son opcionales, pero si vienen rellenos deben tener formato válido.
+  const telefono = fields.telefono?.trim();
+  if (telefono && !PHONE_REGEX.test(telefono)) {
+    return jsonResponse(400, { ok: false, error: "Teléfono inválido." });
+  }
+  const nombre = fields.nombre?.trim();
+  if (nombre && !NAME_REGEX.test(nombre)) {
+    return jsonResponse(400, { ok: false, error: "Nombre inválido." });
+  }
+  const mensaje = fields.mensaje?.trim();
+  if (mensaje && mensaje.length < MIN_MESSAGE_LENGTH) {
+    return jsonResponse(400, { ok: false, error: "El mensaje es demasiado corto." });
+  }
   if (fields.email && !isValidEmail(fields.email)) {
     return jsonResponse(400, { ok: false, error: "Email inválido." });
   }
 
   // El envío real del email (desde facturacio@nimbustelecom.cat) lo hace el escenario de
-  // Make.com enganchado a este webhook; aquí solo reenviamos los datos ya validados
-  // (reCAPTCHA verificado server-side, campos obligatorios comprobados).
-  const makeResponse = await fetch(MAKE_WEBHOOK_URL, {
+  // Make.com correspondiente a este tipo de formulario; aquí solo reenviamos los datos ya
+  // validados (reCAPTCHA verificado server-side, campos comprobados).
+  const makeResponse = await fetch(WEBHOOK_URLS[formId], {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
