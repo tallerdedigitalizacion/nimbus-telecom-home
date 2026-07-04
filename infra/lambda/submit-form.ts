@@ -16,15 +16,6 @@ const PHONE_REGEX = /^\d{7,15}$/;
 const NAME_REGEX = /^[\p{L}\s'-]+$/u;
 const MIN_MESSAGE_LENGTH = 3;
 
-const FIELD_LABELS: Record<string, string> = {
-  nombre: "Nombre",
-  email: "Email",
-  telefono: "Teléfono",
-  mensaje: "Mensaje",
-  aceptacionEmails: "Suscripción a emails",
-  "acceptance-563": "Acepta aviso legal y política de privacidad",
-};
-
 const FORM_META: Record<FormId, { subject: string; requiredFields: string[] }> = {
   "608": { subject: "Nuevo contacto web", requiredFields: ["email", "acceptance-563"] },
   "644": { subject: "Solicitud de llamada", requiredFields: ["telefono", "acceptance-563"] },
@@ -59,12 +50,6 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   });
   const result = (await response.json()) as { success?: boolean; score?: number };
   return Boolean(result.success) && (result.score === undefined || result.score >= RECAPTCHA_MIN_SCORE);
-}
-
-function buildFieldSummary(fields: Record<string, string>): Array<{ label: string; value: string }> {
-  return Object.entries(fields)
-    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
-    .map(([key, value]) => ({ label: FIELD_LABELS[key] ?? key, value }));
 }
 
 export async function handler(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> {
@@ -128,7 +113,7 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
     body: JSON.stringify({
       formId,
       subject: meta.subject,
-      fields: buildFieldSummary(fields),
+      fields,
       idioma,
       pagina,
       replyTo: fields.email && isValidEmail(fields.email) ? fields.email : undefined,
